@@ -382,7 +382,7 @@ class TTLCache(Cache):
                 self.__links[key] = link = _Link(key)
             else:
                 link.unlink()
-            link.expire = now + self.__ttl
+            link.expire = now + self.ttl
             link.next = root = self.__root
             link.prev = prev = root.prev
             prev.next = root.prev = link
@@ -443,6 +443,8 @@ class TTLCache(Cache):
     @property
     def ttl(self):
         """The time-to-live value of the cache's items."""
+        if callable(self.__ttl):
+            return self.__ttl()
         return self.__ttl
 
     def expire(self, now=None):
