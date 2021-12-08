@@ -307,11 +307,11 @@ class _Timer:
 
     def __enter__(self):
         if self.__nesting == 0:
-            self.__time = time = self.__timer()
+            self.__time = now = self.__timer()
         else:
-            time = self.__time
+            now = self.__time
         self.__nesting += 1
-        return time
+        return now
 
     def __exit__(self, *exc):
         self.__nesting -= 1
@@ -373,19 +373,19 @@ class TTLCache(Cache):
             return cache_getitem(self, key)
 
     def __setitem__(self, key, value, cache_setitem=Cache.__setitem__):
-        with self.__timer as time:
-            self.expire(time)
+        with self.__timer as now:
+            self.expire(now)
             cache_setitem(self, key, value)
-        try:
-            link = self.__getlink(key)
-        except KeyError:
-            self.__links[key] = link = _Link(key)
-        else:
-            link.unlink()
-        link.expire = time + self.__ttl
-        link.next = root = self.__root
-        link.prev = prev = root.prev
-        prev.next = root.prev = link
+            try:
+                link = self.__getlink(key)
+            except KeyError:
+                self.__links[key] = link = _Link(key)
+            else:
+                link.unlink()
+            link.expire = now + self.__ttl
+            link.next = root = self.__root
+            link.prev = prev = root.prev
+            prev.next = root.prev = link
 
     def __delitem__(self, key, cache_delitem=Cache.__delitem__):
         cache_delitem(self, key)
@@ -399,17 +399,17 @@ class TTLCache(Cache):
         curr = root.next
         while curr is not root:
             # "freeze" time for iterator access
-            with self.__timer as time:
-                if time < curr.expire:
+            with self.__timer as now:
+                if now < curr.expire:
                     yield curr.key
             curr = curr.next
 
     def __len__(self):
         root = self.__root
         curr = root.next
-        time = self.__timer()
+        now = self.__timer()
         count = len(self.__links)
-        while curr is not root and not (time < curr.expire):
+        while curr is not root and not (now < curr.expire):
             count -= 1
             curr = curr.next
         return count
@@ -425,14 +425,14 @@ class TTLCache(Cache):
         self.expire(self.__timer())
 
     def __repr__(self, cache_repr=Cache.__repr__):
-        with self.__timer as time:
-            self.expire(time)
+        with self.__timer as now:
+            self.expire(now)
             return cache_repr(self)
 
     @property
     def currsize(self):
-        with self.__timer as time:
-            self.expire(time)
+        with self.__timer as now:
+            self.expire(now)
             return super().currsize
 
     @property
@@ -445,15 +445,15 @@ class TTLCache(Cache):
         """The time-to-live value of the cache's items."""
         return self.__ttl
 
-    def expire(self, time=None):
+    def expire(self, now=None):
         """Remove expired items from the cache."""
-        if time is None:
-            time = self.__timer()
+        if now is None:
+            now = self.__timer()
         root = self.__root
         curr = root.next
         links = self.__links
         cache_delitem = Cache.__delitem__
-        while curr is not root and not (time < curr.expire):
+        while curr is not root and not (now < curr.expire):
             cache_delitem(self, curr.key)
             del links[curr.key]
             next = curr.next
@@ -461,8 +461,8 @@ class TTLCache(Cache):
             curr = next
 
     def clear(self):
-        with self.__timer as time:
-            self.expire(time)
+        with self.__timer as now:
+            self.expire(now)
             Cache.clear(self)
 
     def get(self, *args, **kwargs):
@@ -482,8 +482,8 @@ class TTLCache(Cache):
         has not already expired.
 
         """
-        with self.__timer as time:
-            self.expire(time)
+        with self.__timer as now:
+            self.expire(now)
             try:
                 key = next(iter(self.__links))
             except StopIteration:
